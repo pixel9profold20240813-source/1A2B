@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon 1A2B - 即時連線版</title>
+    <title>Neon 1A2B - 競速對戰版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+TC:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
@@ -12,31 +12,66 @@
         .font-orbitron { font-family: 'Orbitron', sans-serif; }
         .neon-text { text-shadow: 0 0 8px var(--neon-blue); }
         .glass-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.1); }
-        .btn-primary { background: linear-gradient(45deg, var(--neon-blue), var(--neon-purple)); transition: all 0.3s ease; }
-        .btn-primary:hover { transform: scale(1.02); box-shadow: 0 0 15px rgba(188, 19, 254, 0.5); }
-        .btn-primary:disabled { opacity: 0.5; transform: none; box-shadow: none; cursor: not-allowed; }
+        
+        /* 按鈕基本樣式 */
+        .btn-primary { 
+            background: linear-gradient(45deg, var(--neon-blue), var(--neon-purple)); 
+            transition: all 0.2s ease; 
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:active { transform: scale(0.95); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; filter: grayscale(0.5); }
+        
+        /* 載入動畫旋轉圖示 */
+        .loader {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 輸入成功閃爍 */
+        .flash-success { animation: flash 0.4s ease-out; }
+        @keyframes flash {
+            0% { background: rgba(0, 243, 255, 0.2); }
+            100% { background: rgba(255, 255, 255, 0.05); }
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 10px; }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
     <div id="app" class="w-full max-w-md">
-        <header class="text-center mb-8">
+        <header class="text-center mb-6">
             <h1 class="text-4xl font-orbitron font-bold neon-text tracking-widest uppercase">Neon 1A2B</h1>
-            <p id="connection-status" class="text-gray-500 text-xs mt-2">正在連接到伺服器...</p>
+            <p id="connection-status" class="text-gray-500 text-xs mt-2">伺服器連線中...</p>
         </header>
 
         <!-- 畫面 1: 首頁 -->
         <section id="screen-lobby" class="glass-card p-8 space-y-6">
-            <button onclick="createRoom()" class="w-full py-4 rounded-xl font-bold btn-primary text-lg">建立新房間</button>
+            <button id="btn-create" onclick="createRoom()" class="w-full py-4 rounded-xl font-bold btn-primary text-lg">
+                <span id="label-create">建立新房間</span>
+            </button>
             <div class="relative flex items-center">
                 <div class="flex-grow border-t border-gray-700"></div>
-                <span class="px-4 text-gray-500 text-sm">或</span>
+                <span class="px-4 text-gray-500 text-sm">或是</span>
                 <div class="flex-grow border-t border-gray-700"></div>
             </div>
-            <div class="space-y-2">
+            <div class="space-y-3">
                 <input type="text" id="join-room-id" placeholder="輸入 6 位房間代碼" maxlength="6" 
                     class="w-full bg-black/40 border border-gray-600 rounded-xl px-4 py-3 text-center tracking-widest font-orbitron outline-none focus:border-cyan-400">
-                <button onclick="joinRoom()" class="w-full py-3 rounded-xl border border-cyan-500/50 hover:bg-cyan-500/10 font-bold text-cyan-400">進入房間代碼</button>
+                <button id="btn-join" onclick="joinRoom()" class="w-full py-3 rounded-xl border border-cyan-500/50 hover:bg-cyan-500/10 font-bold text-cyan-400 flex justify-center items-center">
+                    <span id="label-join">加入房間</span>
+                </button>
             </div>
         </section>
 
@@ -47,57 +82,60 @@
                 <h2 id="display-room-id" class="text-4xl font-orbitron font-bold text-white">------</h2>
             </div>
             <div class="flex justify-around items-center py-4">
-                <div id="p1-status" class="flex flex-col items-center">
-                    <div class="w-12 h-12 rounded-full bg-gray-700 mb-2 flex items-center justify-center border-2 border-transparent">P1</div>
-                    <span class="text-xs text-gray-400">等待中</span>
-                </div>
+                <div id="p1-icon" class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center border-2 border-transparent transition-all">P1</div>
                 <div class="text-cyan-500 font-orbitron animate-pulse">VS</div>
-                <div id="p2-status" class="flex flex-col items-center">
-                    <div class="w-12 h-12 rounded-full bg-gray-700 mb-2 flex items-center justify-center border-2 border-transparent">P2</div>
-                    <span class="text-xs text-gray-400">等待中</span>
-                </div>
+                <div id="p2-icon" class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center border-2 border-transparent transition-all">P2</div>
             </div>
-            <p class="text-sm text-cyan-300 italic animate-pulse">等待另一位玩家加入...</p>
+            <p class="text-sm text-cyan-300 italic animate-bounce">正在等待對手進入...</p>
         </section>
 
         <!-- 畫面 3: 遊戲畫面 -->
         <section id="screen-game" class="hidden space-y-4">
-            <div class="glass-card p-4 flex justify-between items-center text-sm">
-                <div>角色: <span id="player-role-badge" class="font-bold">P?</span></div>
-                <div id="turn-indicator" class="font-bold neon-text">等待設定...</div>
+            <div class="glass-card p-3 flex justify-between items-center text-xs">
+                <span id="player-role-badge" class="font-bold px-2 py-1 rounded bg-white/10">PLAYER</span>
+                <span class="text-gray-400">競速模式：同時開猜</span>
             </div>
 
             <!-- 設定秘密數字 -->
-            <div id="setup-section" class="glass-card p-6 space-y-4">
-                <h3 class="text-center font-bold">設定你的 4 位秘密數字</h3>
+            <div id="setup-section" class="glass-card p-6 space-y-4 border-l-4 border-yellow-500">
+                <h3 class="font-bold">請先設定你的秘密數字</h3>
                 <div class="flex gap-2">
-                    <input type="password" id="secret-input" maxlength="4" placeholder="****"
+                    <input type="password" id="secret-input" maxlength="4" placeholder="4位不重複"
                         class="flex-grow bg-black/40 border border-gray-600 rounded-lg px-4 py-2 text-center text-xl tracking-widest font-orbitron outline-none focus:border-cyan-400">
-                    <button onclick="setSecret()" class="px-6 py-2 btn-primary rounded-lg font-bold">確認</button>
+                    <button id="btn-secret" onclick="setSecret()" class="px-6 py-2 btn-primary rounded-lg font-bold flex items-center">
+                        <span id="label-secret">確認</span>
+                    </button>
                 </div>
             </div>
 
             <!-- 猜測區 -->
             <div id="play-section" class="hidden space-y-4">
-                <div class="glass-card p-4">
+                <div class="glass-card p-4 transition-all" id="guess-container">
+                    <p id="game-tip" class="text-[10px] text-gray-500 mb-2">提示：連續猜測，不必等待</p>
                     <div class="flex gap-2">
-                        <input type="text" id="guess-input" maxlength="4" placeholder="輸入 4 位數"
-                            class="flex-grow bg-black/40 border border-gray-600 rounded-lg px-4 py-3 text-lg tracking-widest font-orbitron outline-none focus:border-purple-500">
-                        <button id="guess-btn" onclick="submitGuess()" class="px-6 py-3 btn-primary rounded-lg font-bold">猜</button>
+                        <input type="text" id="guess-input" maxlength="4" placeholder="輸入猜測..."
+                            class="flex-grow bg-black/40 border border-gray-600 rounded-lg px-4 py-3 text-lg tracking-widest font-orbitron outline-none focus:border-cyan-500">
+                        <button id="guess-btn" onclick="submitGuess()" class="px-6 py-3 btn-primary rounded-lg font-bold flex items-center">
+                            <span id="label-guess">猜！</span>
+                        </button>
                     </div>
                 </div>
-                <div class="glass-card p-4 h-64 overflow-y-auto">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">猜測歷史</h4>
-                    <div id="history-list" class="space-y-2 text-sm"></div>
+                <div class="glass-card p-4 h-80 overflow-y-auto">
+                    <h4 class="text-xs font-bold text-cyan-500 uppercase mb-3 tracking-widest">個人猜測歷史</h4>
+                    <div id="history-list" class="space-y-2"></div>
                 </div>
             </div>
         </section>
 
         <!-- 畫面 4: 結算 -->
         <section id="screen-result" class="hidden glass-card p-8 text-center space-y-6">
-            <h2 id="result-title" class="text-5xl font-orbitron font-bold text-yellow-400">WIN</h2>
-            <p id="result-msg" class="text-gray-300">恭喜你贏了！</p>
-            <button onclick="location.reload()" class="w-full py-4 rounded-xl font-bold btn-primary text-lg">回到首頁</button>
+            <h2 id="result-title" class="text-5xl font-orbitron font-bold">WIN</h2>
+            <p id="result-msg" class="text-gray-300">正在統計...</p>
+            <div class="py-4 border-y border-white/10">
+                <p class="text-sm text-gray-400">對手的數字是</p>
+                <p id="opponent-secret-display" class="text-3xl font-orbitron tracking-widest text-cyan-400">----</p>
+            </div>
+            <button onclick="location.reload()" class="w-full py-4 rounded-xl font-bold btn-primary text-lg">回大廳</button>
         </section>
     </div>
 
@@ -106,7 +144,6 @@
         import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, arrayUnion } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
-        // 你的 Firebase 配置
         const firebaseConfig = {
             apiKey: "AIzaSyCmpCcJ3hQ5UeAzYirbwmTkCdrxwKpcbhU",
             authDomain: "a2b-dea5c.firebaseapp.com",
@@ -119,17 +156,28 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const collectionPath = 'artifacts/1a2b-game/public/data/rooms';
+        const colPath = 'artifacts/1a2b-game/public/data/rooms';
 
         let userId, currentRoomId, playerRole, gameData, unsubscribe = null;
 
-        onAuthStateChanged(auth, u => {
-            if (u) {
-                userId = u.uid;
-                document.getElementById('connection-status').innerText = "伺服器已連線";
-            }
+        onAuthStateChanged(auth, u => { 
+            if(u) userId = u.uid; 
+            document.getElementById('connection-status').innerText = "伺服器已連線"; 
         });
         signInAnonymously(auth);
+
+        // --- 工具：切換按鈕 Loading 狀態 ---
+        const setBtnLoading = (btnId, labelId, isLoading, text = "") => {
+            const btn = document.getElementById(btnId);
+            const label = document.getElementById(labelId);
+            if (isLoading) {
+                btn.disabled = true;
+                label.innerHTML = `<span class="loader"></span>${text}`;
+            } else {
+                btn.disabled = false;
+                label.innerHTML = text;
+            }
+        };
 
         const showScreen = id => {
             ['screen-lobby', 'screen-waiting', 'screen-game', 'screen-result'].forEach(s => document.getElementById(s).classList.add('hidden'));
@@ -137,37 +185,54 @@
         };
 
         window.createRoom = async () => {
-            const rid = Math.random().toString(36).substring(2, 8).toUpperCase();
-            currentRoomId = rid; playerRole = 'p1';
-            await setDoc(doc(db, collectionPath, rid), {
-                p1: userId, p2: null, p1Secret: null, p2Secret: null, turn: 'p1', history: [], winner: null
-            });
-            startListening(rid);
-            document.getElementById('display-room-id').innerText = rid;
-            showScreen('screen-waiting');
+            if(!userId) return;
+            setBtnLoading('btn-create', 'label-create', true, "建立中...");
+            try {
+                const rid = Math.random().toString(36).substring(2, 8).toUpperCase();
+                currentRoomId = rid; 
+                playerRole = 'p1';
+                await setDoc(doc(db, colPath, rid), { p1: userId, p2: null, p1Secret: null, p2Secret: null, history: [], winner: null });
+                document.getElementById('display-room-id').innerText = rid;
+                showScreen('screen-waiting');
+                startListening(rid);
+            } catch (e) {
+                alert("建立失敗：" + e.message);
+            } finally {
+                setBtnLoading('btn-create', 'label-create', false, "建立新房間");
+            }
         };
 
         window.joinRoom = async () => {
             const rid = document.getElementById('join-room-id').value.toUpperCase();
-            if (rid.length !== 6) return alert("請輸入 6 位代碼");
-            const snap = await getDoc(doc(db, collectionPath, rid));
-            if (!snap.exists()) return alert("找不到房間");
-            if (snap.data().p2 && snap.data().p2 !== userId) return alert("房間已滿");
+            if(rid.length !== 6) return alert("請輸入 6 位代碼");
             
-            currentRoomId = rid;
-            playerRole = (snap.data().p1 === userId) ? 'p1' : 'p2';
-            if (!snap.data().p2 && snap.data().p1 !== userId) {
-                await updateDoc(doc(db, collectionPath, rid), { p2: userId });
+            setBtnLoading('btn-join', 'label-join', true, "加入中...");
+            try {
+                const snap = await getDoc(doc(db, colPath, rid));
+                if(!snap.exists()) throw new Error("找不到房間");
+                
+                const d = snap.data();
+                if(d.p1 === userId) playerRole = 'p1';
+                else if(!d.p2 || d.p2 === userId) {
+                    playerRole = 'p2';
+                    if(!d.p2) await updateDoc(doc(db, colPath, rid), { p2: userId });
+                } else throw new Error("房間已滿");
+
+                currentRoomId = rid;
+                document.getElementById('display-room-id').innerText = rid;
+                showScreen('screen-waiting');
+                startListening(rid);
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                setBtnLoading('btn-join', 'label-join', false, "加入房間");
             }
-            startListening(rid);
-            document.getElementById('display-room-id').innerText = rid;
-            showScreen('screen-waiting');
         };
 
         const startListening = rid => {
-            if (unsubscribe) unsubscribe();
-            unsubscribe = onSnapshot(doc(db, collectionPath, rid), snap => {
-                if (!snap.exists()) return;
+            if(unsubscribe) unsubscribe();
+            unsubscribe = onSnapshot(doc(db, colPath, rid), snap => {
+                if(!snap.exists()) return;
                 gameData = snap.data();
                 updateUI();
             });
@@ -175,75 +240,95 @@
 
         const updateUI = () => {
             const d = gameData;
-            // 等待室狀態
-            if (d.p1) document.getElementById('p1-status').children[0].classList.replace('bg-gray-700', 'bg-cyan-500');
-            if (d.p2) {
-                document.getElementById('p2-status').children[0].classList.replace('bg-gray-700', 'bg-purple-500');
-                showScreen('screen-game');
+            if(d.p1) document.getElementById('p1-icon').classList.replace('bg-gray-700', 'bg-cyan-500');
+            if(d.p2) {
+                document.getElementById('p2-icon').classList.replace('bg-gray-700', 'bg-purple-500');
+                if (document.getElementById('screen-game').classList.contains('hidden')) showScreen('screen-game');
             }
 
             document.getElementById('player-role-badge').innerText = playerRole === 'p1' ? "PLAYER 1" : "PLAYER 2";
             
             const mySecret = playerRole === 'p1' ? d.p1Secret : d.p2Secret;
-            if (!mySecret) {
+            const oppSecret = playerRole === 'p1' ? d.p2Secret : d.p1Secret;
+
+            if(!mySecret) {
                 document.getElementById('setup-section').classList.remove('hidden');
                 document.getElementById('play-section').classList.add('hidden');
-                document.getElementById('turn-indicator').innerText = "請設定秘密數字";
             } else {
                 document.getElementById('setup-section').classList.add('hidden');
                 document.getElementById('play-section').classList.remove('hidden');
-                if (!d.p1Secret || !d.p2Secret) {
-                    document.getElementById('turn-indicator').innerText = "等待對方設定...";
-                    document.getElementById('guess-btn').disabled = true;
-                } else {
-                    const isMyTurn = d.turn === playerRole;
-                    document.getElementById('turn-indicator').innerText = isMyTurn ? "你的回合！" : "對方回合...";
-                    document.getElementById('guess-btn').disabled = !isMyTurn;
-                }
+                document.getElementById('guess-btn').disabled = !oppSecret;
+                if(!oppSecret) document.getElementById('game-tip').innerText = "等待對手設定數字...";
+                else document.getElementById('game-tip').innerText = "對手就緒！對決開始！";
             }
 
-            renderHistory(d.history);
-            if (d.winner) {
+            renderMyHistory(d.history);
+
+            if(d.winner) {
                 showScreen('screen-result');
-                document.getElementById('result-title').innerText = d.winner === playerRole ? "VICTORY" : "DEFEAT";
-                document.getElementById('result-msg').innerText = d.winner === playerRole ? "你贏了！" : "對方先猜到了...";
+                const win = d.winner === playerRole;
+                document.getElementById('result-title').innerText = win ? "VICTORY" : "DEFEAT";
+                document.getElementById('result-title').className = `text-5xl font-orbitron font-bold ${win ? 'text-cyan-400' : 'text-red-500'}`;
+                document.getElementById('result-msg').innerText = win ? "你率先破解了對方的代碼！" : "對手先破解了你的代碼！";
+                document.getElementById('opponent-secret-display').innerText = playerRole === 'p1' ? d.p2Secret : d.p1Secret;
             }
         };
 
-        const renderHistory = h => {
+        const renderMyHistory = h => {
             const list = document.getElementById('history-list');
-            list.innerHTML = h.map(i => `
-                <div class="flex justify-between p-2 border-b border-white/5">
-                    <span>${i.player === playerRole ? '你' : '對方'}: <b class="font-orbitron">${i.guess}</b></span>
-                    <span class="font-bold text-cyan-400">${i.a}A ${i.b}B</span>
+            const myHistory = h.filter(i => i.player === playerRole);
+            list.innerHTML = myHistory.map(i => `
+                <div class="flex justify-between items-center p-3 mb-2 rounded bg-white/5 border border-white/10">
+                    <span class="font-orbitron text-lg tracking-widest">${i.guess}</span>
+                    <span class="font-orbitron font-bold">
+                        <span class="text-cyan-400">${i.a}A</span> <span class="text-purple-400">${i.b}B</span>
+                    </span>
                 </div>
             `).reverse().join('');
         };
 
         window.setSecret = async () => {
             const val = document.getElementById('secret-input').value;
-            if (!/^\d{4}$/.test(val) || new Set(val).size !== 4) return alert("請輸入 4 位不重複數字");
-            await updateDoc(doc(db, collectionPath, currentRoomId), playerRole === 'p1' ? { p1Secret: val } : { p2Secret: val });
+            if(!/^\d{4}$/.test(val) || new Set(val).size !== 4) return alert("請輸入 4 位不重複數字");
+            
+            setBtnLoading('btn-secret', 'label-secret', true, "儲存中");
+            try {
+                await updateDoc(doc(db, colPath, currentRoomId), playerRole === 'p1' ? { p1Secret: val } : { p2Secret: val });
+            } finally {
+                setBtnLoading('btn-secret', 'label-secret', false, "確認");
+            }
         };
 
         window.submitGuess = async () => {
             const guess = document.getElementById('guess-input').value;
-            if (!/^\d{4}$/.test(guess) || new Set(guess).size !== 4) return alert("請輸入 4 位不重複數字");
+            if(!/^\d{4}$/.test(guess) || new Set(guess).size !== 4) return alert("請輸入 4 位不重複數字");
             
-            const target = playerRole === 'p1' ? gameData.p2Secret : gameData.p1Secret;
-            let a = 0, b = 0;
-            guess.split('').forEach((g, i) => {
-                if (g === target[i]) a++;
-                else if (target.includes(g)) b++;
-            });
+            setBtnLoading('guess-btn', 'label-guess', true, "");
+            const container = document.getElementById('guess-container');
+            
+            try {
+                const target = playerRole === 'p1' ? gameData.p2Secret : gameData.p1Secret;
+                let a = 0, b = 0;
+                guess.split('').forEach((g, i) => {
+                    if(g === target[i]) a++;
+                    else if(target.includes(g)) b++;
+                });
 
-            const update = {
-                history: arrayUnion({ player: playerRole, guess, a, b }),
-                turn: playerRole === 'p1' ? 'p2' : 'p1'
-            };
-            if (a === 4) update.winner = playerRole;
-            await updateDoc(doc(db, collectionPath, currentRoomId), update);
-            document.getElementById('guess-input').value = '';
+                const update = { history: arrayUnion({ player: playerRole, guess, a, b, time: Date.now() }) };
+                if(a === 4) update.winner = playerRole;
+                
+                await updateDoc(doc(db, colPath, currentRoomId), update);
+                
+                // 成功回饋
+                document.getElementById('guess-input').value = '';
+                container.classList.add('flash-success');
+                setTimeout(() => container.classList.remove('flash-success'), 400);
+            } catch (e) {
+                alert("傳送失敗");
+            } finally {
+                setBtnLoading('guess-btn', 'label-guess', false, "猜！");
+                document.getElementById('guess-input').focus();
+            }
         };
     </script>
 </body>
